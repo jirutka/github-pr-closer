@@ -48,7 +48,7 @@ pip install -r requirements.txt
 
 * Python 3.x
 * {uri-pypi}/bottle[bottle]
-* {uri-pypi}/fn.py[fn.py]
+* {uri-pypi}/funcy[funcy]
 * {uri-pypi}/PyGithub[PyGithub]
 
 
