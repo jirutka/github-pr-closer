@@ -15,7 +15,7 @@ from urllib.request import urlopen
 
 import bottle
 from bottle import BaseResponse, Bottle, HTTPError, abort, post, request, response
-from funcy import cache, keep, memoize, partial as par, rcompose as pipe, re_find
+from funcy import cache, cut_prefix, keep, memoize, partial as par, rcompose as pipe, re_find
 from github import Github
 from github.GithubException import BadCredentialsException, GithubException, TwoFactorException
 
@@ -111,8 +111,9 @@ def is_request_from_github():
 
 
 def remote_ip():
-    return ip_address(request.environ.get('HTTP_X_FORWARDED_FOR') or
-                      request.environ.get('REMOTE_ADDR'))
+    addr = request.environ.get('HTTP_X_FORWARDED_FOR') or request.environ.get('REMOTE_ADDR')
+    # nginx uses ::ffff: as a prefix for IPv4 addresses in ipv6only=off mode.
+    return ip_address(cut_prefix(addr, '::ffff:'))
 
 
 @cache(timeout=86400)
