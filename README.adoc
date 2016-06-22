@@ -1,0 +1,143 @@
+= GitHub Pull Requests Closer
+Jakub Jirutka <https://github.com/jirutka[@jirutka]>
+:source-language: python
+//custom
+:name: github-pr-closer
+:gh-repo: jirutka/{name}
+:uri-wikip: https://en.wikipedia.org/wiki
+:uri-pypi: https://pypi.python.org/pypi
+
+This is a simple webhook handler that processes push events from GitHub and automatically closes pull requests that have been merged, but GitHub didn’t automatically detect them (i.e. commits has been rebased and/or squashed).
+
+It’s built with http://bottlepy.org[Bottle], a WSGI micro web-framework for Python, and requires Python 3. footnote:[It may work with **legacy** Python 2.7, but it’s not tested and I don’t care about supporting legacy Python…]
+
+
+== Why?
+
+When you rebase commits (or just apply plain patches using `git am`), git _re-applies_ changes introduced in these commits on the HEAD of the branch you're rebasing onto.
+This means that the resulting commits have different SHA-1 hash and also different parents, so the relation to the original commits is lost.
+Well, almost, you can still compare just content (diff) of the commits.
+But if you also do some changes when rebasing (e.g. squash some commits, fix typos…), then diffs will not help you much.
+
+Hopefully, there’s one thing that remains the same even when rebasing commits (if it’s done right) – _author’s_ name, email and the date written. footnote:[Git distinguishes _author_, who created the patch, and _committer_, who committed it to the tree.]
+It’s very unlikely that one person created two commits in the same repository at exactly the same time, so we can use it to find the original commit(s) and the corresponding pull request.
+
+There may not be one-to-one mapping, e.g. when the committer has squashed some commits.
+We can say that the pull request will be closed when we find at least one commit that has been merged.
+This may be a problem, what if the committer applied just some of the changes introduced in the pull request?
+To minimize this issue, we can also compare set of the filenames that have been changed (i.e. added, modified, or deleted).
+It’s not bullet proof, but it may be sufficient.
+
+You may ask, how the heck is this useful?
+I created it for https://alpinelinux.org[Alpine Linux], that uses GitHub just as a mirror and pull requests are always merged into the main repository as a set of patches using `git am`.
+It used to be quite often that someone had merged commits from a pull request, but forgot to close it.
+
+
+== Installation
+
+Clone this repository and install dependencies:
+
+[source, sh, subs="verbatim, attributes"]
+----
+git clone git@github.com:{gh-repo}.git
+cd {name}
+pip install -r requirements.txt
+----
+
+=== Requirements
+
+* Python 3.x
+* {uri-pypi}/bottle[bottle]
+* {uri-pypi}/fn.py[fn.py]
+* {uri-pypi}/PyGithub[PyGithub]
+
+
+== Configuration
+
+Configuration is read from the file link:settings.ini[].
+You may change location of the settings file using the environment variable `CONF_FILE`.
+
+Each section of this file (except `DEFAULT`) corresponds to a full name (slug) of a repository you want to process.
+It may contain the following fields.
+
+branches::
+  A comma-separated list of branches to check. Default is `master`.
+
+close_comment::
+  Text that will be added as a comment to a pull request being closed.
+  It may contain placeholder `{commits}` that will be replaced by a list of hashes of the actually merged commits.
+  This field is **required**.
+
+github_token::
+  Your https://github.com/settings/tokens/[GitHub token] for communication with GitHub API.
+  It must have scope `public_repo`.
+  This field is **required**.
+
+hook_secret::
+  Webhook secret used by GitHub to sign the message.
+  This field is **required**.
+
+You can also declare default values for all repositories in special section named `DEFAULT`.
+
+
+== Run it
+
+There are multiple ways how to run it:
+
+* with the built-in default WSGI server based on https://docs.python.org/3/library/wsgiref.html#module-wsgiref.simple_server[wsgiref],
+* under a {uri-wikip}/Web_Server_Gateway_Interface[WSGI] server like https://uwsgi-docs.readthedocs.org[uWSGI], http://gunicorn.org[Gunicorn], {uri-pypi}/mod_wsgi[mod_wsgi], … (recommended)
+* as a {uri-wikip}/Common_Gateway_Interface[CGI] script.
+
+=== Run with the built-in server
+
+Simply execute the `app.py`:
+
+[source]
+python3 app.py
+
+Then you can access the app on http://localhost:8080.
+The port and host may be changed using environment variables `HTTP_PORT` and `HTTP_HOST`.
+
+=== Run with uWSGI and nginx
+
+If you have many micro-apps like this, it’s IMO kinda overkill to run each in a separate uWSGI process, isn’t it?
+It’s not so well known, but uWSGI allows to “mount” multiple application in a single uWSGI process and with a single socket.
+
+.Sample uWSGI configuration:
+[source, ini, subs="verbatim, attributes"]
+----
+[uwsgi]
+plugins = python34
+socket = /run/uwsgi/main.sock
+chdir = /var/www/scripts
+logger = file:/var/log/uwsgi/main.log
+processes = 1
+threads = 2
+# map URI paths to applications
+mount = /hooks/{name}={name}/app.py
+#mount = /other/foo=foo/app.py
+manage-script-name = true
+----
+
+.Sample nginx configuration as a reverse proxy in front of uWSGI:
+[source, nginx, subs="verbatim, attributes"]
+----
+server {
+    listen 443 ssl;
+    server_name example.org;
+
+    ssl_certificate /etc/ssl/nginx/nginx.crt;
+    ssl_certificate_key /etc/ssl/nginx/nginx.key;
+
+    location /hooks/{name} {
+        uwsgi_pass unix:/run/uwsgi/main.sock;
+        include uwsgi_params;
+    }
+}
+----
+
+
+== License
+
+This project is licensed under http://opensource.org/licenses/MIT/[MIT License].
+For the full text of the license, see the link:LICENSE[LICENSE] file.
