@@ -71,18 +71,18 @@ def handle_push():
     if branch not in re.split(r',\s*', conf.get('branches', 'master')):
         abort(200, "Skipping push into branch: %s" % branch)
 
-    closed_pulls = []
+    closed_pullreqs = []
     try:
         repo = Github(conf.get('github_token'), base_url=GH_BASE_URL).get_repo(repo_slug)
         pushed_commits = (repo.get_commit(c['id'])
                           for c in payload.get('commits', []))
 
-        for pull, merged_commits in find_matching_pulls(repo, pushed_commits):
-            pull_id = "%s#%s" % (repo_slug, pull.number)
+        for pullreq, merged_commits in find_matching_pulls(repo, pushed_commits):
+            pullreq_id = "%s#%s" % (repo_slug, pullreq.number)
 
-            LOG.debug("Closing pull request %s", pull_id)
-            close_pull_with_comment(pull, gen_comment(repo_slug, merged_commits))
-            closed_pulls.append(pull_id)
+            LOG.debug("Closing pull request %s", pullreq_id)
+            close_pullreq_with_comment(pullreq, gen_comment(repo_slug, merged_commits))
+            closed_pullreqs.append(pullreq_id)
 
     except (BadCredentialsException, TwoFactorException) as e:
         abort(500, "Authentication error, GitHub returned: %s" % e)
@@ -90,8 +90,8 @@ def handle_push():
     except GithubException as e:
         abort(503, str(e))
 
-    if closed_pulls:
-        abort(200, "Closed pull requests: %s" % ', '.join(closed_pulls))
+    if closed_pullreqs:
+        abort(200, "Closed pull requests: %s" % ', '.join(closed_pullreqs))
     else:
         abort(200, 'No pull request has been closed')
 
@@ -149,13 +149,13 @@ def find_matching_pulls(gh_repo, commits):
     commits_by_author = {commit_git_author(c): c for c in commits}
     find_matching_commit = pipe(commit_git_author, commits_by_author.get)
 
-    for pull in gh_repo.get_pulls(state='open'):
-        pushed_commits = list(keep(find_matching_commit, pull.get_commits()))
-        pushed_files = (f.filename for c in pushed_commits for f in c.files)
-        pull_files = (f.filename for f in pull.get_files())
+    for pullreq in gh_repo.get_pulls(state='open'):
+        merged_commits = list(keep(find_matching_commit, pullreq.get_commits()))
+        merged_files = (f.filename for c in merged_commits for f in c.files)
+        pullreq_files = (f.filename for f in pullreq.get_files())
 
-        if any(pushed_commits) and set(pushed_files) == set(pull_files):
-            yield pull, pushed_commits
+        if any(merged_commits) and set(merged_files) == set(pullreq_files):
+            yield pullreq, merged_commits
 
 
 def commit_git_author(commit):
@@ -168,9 +168,9 @@ def gen_comment(repo_slug, commits=[]):
     return comment.format(commits=', '.join(c.sha for c in commits))
 
 
-def close_pull_with_comment(pull, comment):
-    pull.create_issue_comment(comment)
-    pull.edit(state='closed')
+def close_pullreq_with_comment(pullreq, comment):
+    pullreq.create_issue_comment(comment)
+    pullreq.edit(state='closed')
 
 
 @memoize
