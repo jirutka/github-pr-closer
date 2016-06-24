@@ -47,7 +47,7 @@ def post_index():
 
 
 def handle_ping():
-    return json.dumps({'msg': 'pong'})
+    return {'msg': 'pong'}
 
 
 def handle_push():
@@ -69,7 +69,7 @@ def handle_push():
 
     branch = ref_head_name(payload.get('ref', ''))
     if branch not in re.split(r',\s*', conf.get('branches', 'master')):
-        abort(200, "Skipping push into branch: %s" % branch)
+        return ok("Skipping push into branch: %s" % branch)
 
     closed_pullreqs = []
     try:
@@ -91,19 +91,20 @@ def handle_push():
         abort(503, str(e))
 
     if closed_pullreqs:
-        abort(200, "Closed pull requests: %s" % ', '.join(closed_pullreqs))
+        return ok("Closed pull requests: %s" % ', '.join(closed_pullreqs))
     else:
-        abort(200, 'No pull request has been closed')
+        return ok('No pull request has been closed')
 
 
 def default_handler(resp):
-    if resp.status_code >= 400:
-        response.content_type = 'application/problem+json'
-        LOG.error(resp.body)
-        return json.dumps({'title': resp.body, 'status': resp.status_code})
-    else:
-        LOG.info(resp.body)
-        return json.dumps({'msg': resp.body})
+    response.content_type = 'application/problem+json'
+    LOG.error(resp.body)
+    return json.dumps({'title': resp.body, 'status': resp.status_code})
+
+
+def ok(message):
+    LOG.info(message)
+    return {'msg': message}
 
 
 def is_request_from_github():
