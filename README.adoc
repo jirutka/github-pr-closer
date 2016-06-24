@@ -9,7 +9,7 @@ Jakub Jirutka <https://github.com/jirutka[@jirutka]>
 
 This is a simple webhook handler that processes push events from GitHub and automatically closes pull requests that have been merged, but GitHub didn’t automatically detect them (i.e. commits has been rebased and/or squashed).
 
-It’s built with http://bottlepy.org[Bottle], a WSGI micro web-framework for Python, and requires Python 3. footnote:[It may work with **legacy** Python 2.7, but it’s not tested and I don’t care about supporting legacy Python…]
+It’s built with http://bottlepy.org[Bottle], a WSGI micro web-framework for Python, and requires Python 3.3+. footnote:[No, it doesn’t work with **legacy** Python 2.7 and I’m not gonna support it… Just install Python 3.]
 
 
 == Why?
@@ -50,6 +50,7 @@ pip install -r requirements.txt
 * {uri-pypi}/bottle[bottle]
 * {uri-pypi}/funcy[funcy]
 * {uri-pypi}/PyGithub[PyGithub]
+* {uri-pypi}/typing[typing] _(needed only for Python older than 3.5)_
 
 
 == Configuration

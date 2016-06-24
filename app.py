@@ -1,23 +1,35 @@
 #!/usr/bin/env python3
 
 from configparser import ConfigParser
+from datetime import datetime
 import hashlib
 import hmac
-from ipaddress import ip_address, ip_network
+from io import BytesIO
+from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network, ip_address, ip_network
 import json
 import logging
 from logging import DEBUG, INFO
 import os
 from os import environ, path
 import re
-import urllib
+from urllib.error import URLError
 from urllib.request import urlopen
 
 import bottle
 from bottle import BaseResponse, Bottle, HTTPError, abort, post, request, response
 from funcy import cache, cut_prefix, keep, memoize, partial as par, rcompose as pipe, re_find
 from github import Github
+from github.Commit import Commit
 from github.GithubException import BadCredentialsException, GithubException, TwoFactorException
+from github.PullRequest import PullRequest
+from github.Repository import Repository
+
+# type hints per PEP 484
+from typing import Generator, Iterable as Iter, List, Tuple, Union
+AuthorTuple = Tuple[str, str, datetime]
+IPAddress = Union[IPv4Address, IPv6Address]
+IPNetwork = Union[IPv4Network, IPv6Network]
+
 
 GH_BASE_URL = 'https://api.github.com'
 BASE_DIR = path.dirname(__file__)
@@ -96,40 +108,40 @@ def handle_push():
         return ok('No pull request has been closed')
 
 
-def default_handler(resp):
+def default_handler(resp: BaseResponse):
     response.content_type = 'application/problem+json'
     LOG.error(resp.body)
     return json.dumps({'title': resp.body, 'status': resp.status_code})
 
 
-def ok(message):
+def ok(message: str) -> dict:
     LOG.info(message)
     return {'msg': message}
 
 
-def is_request_from_github():
+def is_request_from_github() -> bool:
     return any(remote_ip() in net for net in github_source_networks())
 
 
-def remote_ip():
+def remote_ip() -> IPAddress:
     addr = request.environ.get('HTTP_X_FORWARDED_FOR') or request.environ.get('REMOTE_ADDR')
     # nginx uses ::ffff: as a prefix for IPv4 addresses in ipv6only=off mode.
     return ip_address(cut_prefix(addr, '::ffff:'))
 
 
 @cache(timeout=86400)
-def github_source_networks():
+def github_source_networks() -> List[IPNetwork]:
     try:
         resp = urlopen("%s/meta" % GH_BASE_URL, timeout=5)
         data = json.loads(resp.read().decode('utf-8'))
 
         return [ip_network(net) for net in data['hooks']]
 
-    except (urllib.error.URLError, ValueError, KeyError) as e:
+    except (URLError, ValueError, KeyError) as e:
         raise GithubResponseError('Failed to fetch list of allowed IP addresses from GitHub', e)
 
 
-def verify_signature(secret, signature, resp_body):
+def verify_signature(secret: str, signature: str, resp_body: BytesIO) -> None:
     try:
         alg, digest = signature.lower().split('=', 1)
     except (ValueError, AttributeError):
@@ -146,7 +158,7 @@ def verify_signature(secret, signature, resp_body):
         raise InvalidSignatureError('digests do not match')
 
 
-def find_matching_pulls(gh_repo, commits):
+def find_matching_pulls(gh_repo: Repository, commits: Iter[Commit]) -> Generator:
     commits_by_author = {commit_git_author(c): c for c in commits}
     find_matching_commit = pipe(commit_git_author, commits_by_author.get)
 
@@ -159,12 +171,12 @@ def find_matching_pulls(gh_repo, commits):
             yield pullreq, merged_commits
 
 
-def commit_git_author(commit):
+def commit_git_author(commit: Commit) -> AuthorTuple:
     a = commit.commit.author
     return (a.name, a.email, a.date)
 
 
-def gen_comment(repo_slug, commits):
+def gen_comment(repo_slug: str, commits: List[Commit]) -> str:
     comment = config()[repo_slug]['close_comment']
 
     # Get committer's GitHub login, or just a name if his email is not
@@ -178,13 +190,13 @@ def gen_comment(repo_slug, commits):
                           commits=', '.join(c.sha for c in commits))
 
 
-def close_pullreq_with_comment(pullreq, comment):
+def close_pullreq_with_comment(pullreq: PullRequest, comment: str) -> None:
     pullreq.create_issue_comment(comment)
     pullreq.edit(state='closed')
 
 
 @memoize
-def config():
+def config() -> ConfigParser:
     conf = ConfigParser()
     conf.read([path.join(BASE_DIR, 'settings.ini'), os.getenv('CONF_FILE', '')])
     return conf
@@ -192,20 +204,20 @@ def config():
 
 class InvalidSignatureError(HTTPError):
 
-    def __init__(self, message, **kwargs):
+    def __init__(self, message: str, **kwargs) -> None:
         msg = "Invalid X-Hub-Signature: %s" % message
         super().__init__(status=403, body=msg, **kwargs)
 
 
 class GithubResponseError(HTTPError):
 
-    def __init__(self, message, exception, **kwargs):
+    def __init__(self, message: str, exception: Exception, **kwargs) -> None:
         msg = "%s: %s" % (message, exception)
         super().__init__(status=503, body=msg, exception=exception, **kwargs)
 
 
 # Monkey-patch bottle.
-Bottle.default_error_handler = lambda _, resp: default_handler(resp)
+Bottle.default_error_handler = lambda _, resp: default_handler(resp)  # type: ignore
 BaseResponse.default_content_type = 'application/json;charset=utf-8'
 
 # Set up logging.
@@ -215,7 +227,7 @@ LOG.setLevel(DEBUG if environ.get('DEBUG') else INFO)
 # Run bottle internal server when invoked directly (mainly for development).
 if __name__ == '__main__':
     bottle.run(host=environ.get('HTTP_HOST', '127.0.0.1'),
-               port=environ.get('HTTP_PORT', 8080))
+               port=environ.get('HTTP_PORT', '8080'))
 # Run bottle in application mode (in production under uWSGI server).
 else:
     application = bottle.default_app()
