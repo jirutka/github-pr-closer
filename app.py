@@ -163,9 +163,18 @@ def commit_git_author(commit):
     return (a.name, a.email, a.date)
 
 
-def gen_comment(repo_slug, commits=[]):
+def gen_comment(repo_slug, commits):
     comment = config()[repo_slug]['close_comment']
-    return comment.format(commits=', '.join(c.sha for c in commits))
+
+    # Get committer's GitHub login, or just a name if his email is not
+    # associated with any GitHub account.
+    try:
+        committer = "@%s" % commits[0].committer.login
+    except AttributeError:
+        committer = commits[0].commit.committer.name
+
+    return comment.format(committer=committer,
+                          commits=', '.join(c.sha for c in commits))
 
 
 def close_pullreq_with_comment(pullreq, comment):
