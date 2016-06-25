@@ -108,7 +108,7 @@ def handle_push():
         return ok('No pull request has been closed')
 
 
-def default_handler(resp: BaseResponse):
+def default_error_handler(resp: BaseResponse):
     response.content_type = 'application/problem+json'
     LOG.error(resp.body)
     return json.dumps({'title': resp.body, 'status': resp.status_code})
@@ -217,7 +217,7 @@ class GithubResponseError(HTTPError):
 
 
 # Monkey-patch bottle.
-Bottle.default_error_handler = lambda _, resp: default_handler(resp)  # type: ignore
+Bottle.default_error_handler = lambda _, resp: default_error_handler(resp)  # type: ignore
 BaseResponse.default_content_type = 'application/json;charset=utf-8'
 
 # Set up logging.
