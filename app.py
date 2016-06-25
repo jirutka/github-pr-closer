@@ -235,8 +235,14 @@ def close_pullreq_with_comment(pullreq: PullRequest, comment: str) -> None:
 
 @memoize
 def config() -> ConfigParser:
+    """Read settings from a file.
+
+    It tries to read ``./settings.ini`` and a file specified by the environment
+    variable ``CONF_FILE``. If none of them exist, then it raises an error.
+    """
     conf = ConfigParser()
-    conf.read([path.join(BASE_DIR, 'settings.ini'), os.getenv('CONF_FILE', '')])
+    if not conf.read([path.join(BASE_DIR, 'settings.ini'), os.getenv('CONF_FILE', '')]):
+        raise FileNotFoundError('No configuration file was found.')
     return conf
 
 
@@ -261,6 +267,13 @@ BaseResponse.default_content_type = 'application/json;charset=utf-8'
 # Set up logging.
 logging.basicConfig(format="%(levelname)s: %(message)s")
 LOG.setLevel(DEBUG if environ.get('DEBUG') else INFO)
+
+# Fail fast when config file is not found.
+try:
+    config()
+except FileNotFoundError as e:
+    LOG.fatal(e)
+    exit(1)
 
 # Run bottle internal server when invoked directly (mainly for development).
 if __name__ == '__main__':
