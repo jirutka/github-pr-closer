@@ -3,9 +3,14 @@ Jakub Jirutka <https://github.com/jirutka[@jirutka]>
 :source-language: python
 //custom
 :name: github-pr-closer
-:gh-repo: jirutka/{name}
+:gh-name: jirutka/{name}
+:gh-branch: master
 :uri-wikip: https://en.wikipedia.org/wiki
 :uri-pypi: https://pypi.python.org/pypi
+
+ifdef::env-github[]
+image:https://travis-ci.org/{gh-name}.svg?branch={gh-branch}["Build Status", link="https://travis-ci.org/{gh-name}"]
+endif::env-github[]
 
 This is a simple webhook handler that processes push events from GitHub and automatically closes pull requests that have been merged, but GitHub didn’t automatically detect them (i.e. commits has been rebased and/or squashed).
 
@@ -39,7 +44,7 @@ Clone this repository and install dependencies:
 
 [source, sh, subs="verbatim, attributes"]
 ----
-git clone git@github.com:{gh-repo}.git
+git clone git@github.com:{gh-name}.git
 cd {name}
 pip install -r requirements.txt
 ----
