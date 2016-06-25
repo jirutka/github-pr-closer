@@ -1,0 +1,24 @@
+#!/bin/bash
+# vim: set ts=4:
+set -eu -o pipefail
+
+cd "$(dirname "$0")/.."
+
+for PYTHON in "${PYTHON:-}" python3 python NOT_FOUND; do
+	command -v "$PYTHON" &>/dev/null && break
+done
+
+if [ "$PYTHON" = 'NOT_FOUND' ]; then
+	echo 'ERROR: Could not find python executable!' >&2
+	exit 1
+fi
+
+if ! $PYTHON -c 'import sys; exit(not sys.version_info >= (3, 3, 0))'; then
+	echo "Python 3.3+ is required, but you have $($PYTHON -V 2>&1)!" >&2
+	exit 1
+fi
+
+echo '==> Installing dependencies...'
+$PYTHON -m pip install -r requirements-dev.txt 2>&1 \
+	| sed	-e '/^Requirement already satisfied/d' \
+			-e '/don.t match your environment$/d'
