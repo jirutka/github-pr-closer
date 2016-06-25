@@ -71,7 +71,7 @@ branches::
 
 close_comment::
   Text that will be added as a comment to a pull request being closed.
-  It may contain placeholder `{commits}` that will be replaced by a list of hashes of the actually merged commits.
+  It may contain placeholder `{committer}` that will be replaced by GitHub login (prefixed with `@`) or name (if the login is not available) of the committer, and `{commits}` that will be replaced by a list of hashes of the actually merged commits.
   This field is **required**.
 
 github_token::
