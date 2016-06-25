@@ -120,10 +120,14 @@ def ok(message: str) -> dict:
 
 
 def is_request_from_github() -> bool:
+    """Return True if the current request comes from GitHub."""
+
     return any(remote_ip() in net for net in github_source_networks())
 
 
 def remote_ip() -> IPAddress:
+    """Return request's IP address (i.e. address of the client)."""
+
     addr = request.environ.get('HTTP_X_FORWARDED_FOR') or request.environ.get('REMOTE_ADDR')
     # nginx uses ::ffff: as a prefix for IPv4 addresses in ipv6only=off mode.
     return ip_address(cut_prefix(addr, '::ffff:'))
@@ -131,6 +135,8 @@ def remote_ip() -> IPAddress:
 
 @cache(timeout=86400)
 def github_source_networks() -> List[IPNetwork]:
+    """Return GitHub's IP addresses that may be used for delivering webhook events."""
+
     try:
         resp = urlopen("%s/meta" % GH_BASE_URL, timeout=5)
         data = json.loads(resp.read().decode('utf-8'))
@@ -142,6 +148,10 @@ def github_source_networks() -> List[IPNetwork]:
 
 
 def verify_signature(secret: str, signature: str, resp_body: BytesIO) -> None:
+    """Verify HMAC-SHA1 signature of the given response body.
+
+    The signature is expected to be in format ``sha1=<hex-digest>``.
+    """
     try:
         alg, digest = signature.lower().split('=', 1)
     except (ValueError, AttributeError):
@@ -159,6 +169,18 @@ def verify_signature(secret: str, signature: str, resp_body: BytesIO) -> None:
 
 
 def find_matching_pulls(gh_repo: Repository, commits: Iter[Commit]) -> Generator:
+    """Find pull requests that contains commits matching the given ``commits``.
+
+    It yields tuple :class:`PullRequest` and list of the matched
+    :class:`Commit`s (subset of the given ``commits``).
+
+    The matching algorithm is based on comparing commits by an *author*
+    (triplet name, email and date) and set of the affected files (just file
+    names). The match is found when a pull request contains at least one commit
+    from the given ``commits`` (i.e. their author triplet is the same), and
+    an union of filenames affected by all the matching commits is the same as of
+    all the pull request's commits.
+    """
     commits_by_author = {commit_git_author(c): c for c in commits}
     find_matching_commit = pipe(commit_git_author, commits_by_author.get)
 
@@ -172,11 +194,27 @@ def find_matching_pulls(gh_repo: Repository, commits: Iter[Commit]) -> Generator
 
 
 def commit_git_author(commit: Commit) -> AuthorTuple:
+    """Return git *author* from the given ``commit`` as a triple."""
+
     a = commit.commit.author
     return (a.name, a.email, a.date)
 
 
 def gen_comment(repo_slug: str, commits: List[Commit]) -> str:
+    """Return closing comment for the specified repository.
+
+    The comment template is read from config file under the repository's
+    section and key ``close_comment``. It may contain replacement fields:
+
+    committer
+      Will be replaced by GitHub login (prefixed with ``@``) or name (if the
+      login is not available) of the committer (based on the first commit from
+      the given ``commits``).
+
+    commits
+      Will be replaced by a comma-separated list of the ``commits``
+      SHA hashes.
+    """
     comment = config()[repo_slug]['close_comment']
 
     # Get committer's GitHub login, or just a name if his email is not
