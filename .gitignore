@@ -3,3 +3,4 @@ env/
 venv/
 .env
 *.py[cod]
+settings.ini
