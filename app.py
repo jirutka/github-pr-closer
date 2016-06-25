@@ -262,7 +262,6 @@ class GithubResponseError(HTTPError):
 
 # Monkey-patch bottle.
 Bottle.default_error_handler = lambda _, resp: default_error_handler(resp)  # type: ignore
-BaseResponse.default_content_type = 'application/json;charset=utf-8'
 
 # Set up logging.
 logging.basicConfig(format="%(levelname)s: %(message)s")
