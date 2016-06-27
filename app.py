@@ -34,6 +34,7 @@ IPNetwork = Union[IPv4Network, IPv6Network]
 GH_BASE_URL = 'https://api.github.com'
 BASE_DIR = path.dirname(__file__)
 LOG = logging.getLogger(__name__)
+VERSION = '0.1.0'
 
 ref_head_name = par(re_find, r'refs/heads/(.*)')
 
@@ -59,7 +60,7 @@ def post_index():
 
 
 def handle_ping():
-    return {'msg': 'pong'}
+    return {'msg': "github-pr-closer %s" % VERSION}
 
 
 def handle_push():
@@ -266,6 +267,8 @@ Bottle.default_error_handler = lambda _, resp: default_error_handler(resp)  # ty
 # Set up logging.
 logging.basicConfig(format="%(levelname)s: %(message)s")
 LOG.setLevel(DEBUG if environ.get('DEBUG') else INFO)
+
+LOG.info("Starting github-pr-closer %s" % VERSION)
 
 # Fail fast when config file is not found.
 try:
