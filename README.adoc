@@ -66,8 +66,12 @@ You may change location of the settings file using the environment variable `CON
 Each section of this file (except `DEFAULT`) corresponds to a full name (slug) of a repository you want to process.
 It may contain the following fields.
 
-branches::
-  A comma-separated list of branches to check. Default is `master`.
+branch_regex::
+  A regular expression that specifies branches which should be processed.
+  Push events from branches that don’t match this regular expression will be ignored.
+  To match all branches, use `.*`.
+  If you want to match branches `master` and `dev`, use `(master|dev)`.
+  Default is `master`.
 
 close_comment::
   Text that will be added as a comment to a pull request being closed.

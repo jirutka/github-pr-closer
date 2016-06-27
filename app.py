@@ -80,7 +80,7 @@ def handle_push():
                      request.body)
 
     branch = ref_head_name(payload.get('ref', ''))
-    if branch not in re.split(r',\s*', conf.get('branches', 'master')):
+    if not re.match(r"^%s$" % conf.get('branch_regex', 'master'), branch):
         return ok("Skipping push into branch: %s" % branch)
 
     closed_pullreqs = []

@@ -6,4 +6,4 @@ close_comment = Merged in {commits} by {committer}. Thanks for your contribution
 
 [username/reponame]
 hook_secret = --SOME-RANDOM-PASSPHRASE--
-branches = master
+branch_regex = (master|dev)
