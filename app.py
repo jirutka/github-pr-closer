@@ -113,7 +113,14 @@ def handle_push():
 
 def default_error_handler(resp: BaseResponse):
     response.content_type = 'application/problem+json'
-    LOG.error(resp.body)
+
+    msg = "%s, caused by: %s" % (resp.body, resp.exception) \
+        if getattr(resp, 'exception', None) else resp.body
+    LOG.error(msg)
+
+    if resp.status_code >= 500 and getattr(resp, 'traceback', None):
+        LOG.debug(resp.traceback)
+
     return json.dumps({'title': resp.body, 'status': resp.status_code})
 
 
