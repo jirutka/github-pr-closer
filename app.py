@@ -287,7 +287,7 @@ LOG.info("Starting github-pr-closer %s" % VERSION)
 try:
     config()
 except FileNotFoundError as e:
-    LOG.fatal(e)
+    LOG.critical("%s" % e)
     exit(1)
 
 # Run bottle internal server when invoked directly (mainly for development).
