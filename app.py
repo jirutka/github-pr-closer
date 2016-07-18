@@ -76,6 +76,8 @@ def handle_push():
     except KeyError:
         abort(400, "Unknown repository: %s" % repo_slug)
 
+    LOG.info("Handling push from repository: %s", repo_slug)
+
     verify_signature(conf.get('hook_secret', ''),
                      request.get_header('X-Hub-Signature'),
                      request.body)
@@ -139,6 +141,7 @@ def github_source_networks() -> List[IPNetwork]:
     """Return GitHub's IP addresses that may be used for delivering webhook events."""
 
     try:
+        LOG.debug('Fetching GitHub /meta')
         resp = urlopen("%s/meta" % GH_BASE_URL, timeout=5)
         data = json.loads(resp.read().decode('utf-8'))
 
@@ -182,10 +185,13 @@ def find_matching_pulls(gh_repo: Repository, commits: Iter[Commit]) -> Generator
     an union of filenames affected by all the matching commits is the same as of
     all the pull request's commits.
     """
+    LOG.debug('Fetching commits referenced in payload')
     commits_by_author = {commit_git_author(c): c for c in commits}
     find_matching_commit = pipe(commit_git_author, commits_by_author.get)
 
     for pullreq in gh_repo.get_pulls(state='open'):
+        LOG.debug("Checking pull request #%s", pullreq.number)
+
         merged_commits = list(keep(find_matching_commit, pullreq.get_commits()))
         merged_files = (f.filename for c in merged_commits for f in c.files)
         pullreq_files = (f.filename for f in pullreq.get_files())
