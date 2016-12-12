@@ -174,7 +174,7 @@ def verify_signature(secret: str, signature: str, resp_body: BytesIO) -> None:
     if alg != 'sha1':
         raise InvalidSignatureError("expected type sha1, but got %s" % alg)
 
-    computed_digest = hmac.new(secret.encode('utf-8'),
+    computed_digest = hmac.new(secret.encode('utf-8'),  # type: ignore
                                msg=resp_body.getbuffer(),
                                digestmod=hashlib.sha1).hexdigest()
 
