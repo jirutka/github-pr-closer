@@ -35,7 +35,7 @@ IPNetwork = Union[IPv4Network, IPv6Network]
 GH_BASE_URL = 'https://api.github.com'
 BASE_DIR = path.dirname(__file__)
 LOG = logging.getLogger(__name__)
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 
 CacheItem = NamedTuple('CacheItem', [('value', Any), ('updated_at', datetime)])
 
