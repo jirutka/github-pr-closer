@@ -17,7 +17,8 @@ from urllib.request import urlopen
 
 import bottle
 from bottle import BaseResponse, Bottle, HTTPError, abort, post, request, response
-from funcy import cache, cut_prefix, keep, memoize, partial as par, rcompose as pipe, re_find
+from cachetools import Cache, LRUCache
+from funcy import cache, cut_prefix, keep, memoize, partial as par, re_find
 from github import Github
 from github.Commit import Commit
 from github.GithubException import BadCredentialsException, GithubException, TwoFactorException
@@ -25,7 +26,7 @@ from github.PullRequest import PullRequest
 from github.Repository import Repository
 
 # type hints per PEP 484
-from typing import Generator, Iterable as Iter, List, Tuple, Union
+from typing import Any, Generator, Iterable as Iter, List, MutableMapping, NamedTuple, Tuple, Union
 AuthorTuple = Tuple[str, str, datetime]
 IPAddress = Union[IPv4Address, IPv6Address]
 IPNetwork = Union[IPv4Network, IPv6Network]
@@ -35,6 +36,8 @@ GH_BASE_URL = 'https://api.github.com'
 BASE_DIR = path.dirname(__file__)
 LOG = logging.getLogger(__name__)
 VERSION = '0.2.0'
+
+CacheItem = NamedTuple('CacheItem', [('value', Any), ('updated_at', datetime)])
 
 ref_head_name = par(re_find, r'refs/heads/(.*)')
 
@@ -194,17 +197,21 @@ def find_matching_pulls(gh_repo: Repository, commits: Iter[Commit]) -> Generator
     """
     LOG.debug('Fetching commits referenced in payload')
     commits_by_author = {commit_git_author(c): c for c in commits}
-    find_matching_commit = pipe(commit_git_author, commits_by_author.get)
+    find_matching_commit = commits_by_author.get
+    cache = shared_cache()
 
     for pullreq in gh_repo.get_pulls(state='open'):
         LOG.debug("Checking pull request #%s", pullreq.number)
 
-        merged_commits = list(keep(find_matching_commit, pullreq.get_commits()))
+        merged_commits = list(keep(find_matching_commit, pullreq_commits_authors(pullreq, cache)))
         merged_files = (f.filename for c in merged_commits for f in c.files)
         pullreq_files = (f.filename for f in pullreq.get_files())
 
         if any(merged_commits) and set(merged_files) == set(pullreq_files):
+            del cache[pullreq.id]
             yield pullreq, merged_commits
+
+    LOG.debug("Cached items: %d, max size: %d" % (cache.currsize, cache.maxsize))
 
 
 def commit_git_author(commit: Commit) -> AuthorTuple:
@@ -212,6 +219,23 @@ def commit_git_author(commit: Commit) -> AuthorTuple:
 
     a = commit.commit.author
     return (a.name, a.email, a.date)
+
+
+def pullreq_commits_authors(pullreq: PullRequest,
+                            cache: MutableMapping[int, CacheItem]) -> List[AuthorTuple]:
+    """Return a list of git authors of all commits contained in the given pull request."""
+
+    cached_item = cache.get(pullreq.id)
+
+    if cached_item and cached_item.updated_at >= pullreq.updated_at:
+        LOG.debug("Using cached data for pull request #%s", pullreq.number)
+        commits_authors = cached_item.value
+    else:
+        LOG.debug("Loading commits for pull request #%s", pullreq.number)
+        commits_authors = [commit_git_author(c) for c in pullreq.get_commits()]
+        cache[pullreq.id] = CacheItem(commits_authors, pullreq.updated_at)
+
+    return commits_authors
 
 
 def gen_comment(repo_slug: str, commits: List[Commit]) -> str:
@@ -245,6 +269,12 @@ def gen_comment(repo_slug: str, commits: List[Commit]) -> str:
 def close_pullreq_with_comment(pullreq: PullRequest, comment: str) -> None:
     pullreq.create_issue_comment(comment)
     pullreq.edit(state='closed')
+
+
+@memoize
+def shared_cache() -> Cache:
+    maxsize = config()['DEFAULT'].getint('cache_maxsize', 250)
+    return LRUCache(maxsize=maxsize)
 
 
 @memoize

@@ -53,6 +53,7 @@ pip install -r requirements.txt
 
 * Python 3.x
 * {uri-pypi}/bottle[bottle]
+* {uri-pypi}/cachetools[cachetools]
 * {uri-pypi}/funcy[funcy]
 * {uri-pypi}/PyGithub[PyGithub]
 * {uri-pypi}/typing[typing] _(needed only for Python older than 3.5)_
@@ -72,6 +73,10 @@ branch_regex::
   To match all branches, use `.*`.
   If you want to match branches `master` and `dev`, use `(master|dev)`.
   Default is `master`.
+
+cache_maxsize::
+  Maximum number of pull requests' metadata to keep in LRU cache.
+  Default is 250.
 
 close_comment::
   Text that will be added as a comment to a pull request being closed.
