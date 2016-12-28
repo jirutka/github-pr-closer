@@ -64,8 +64,11 @@ pip install -r requirements.txt
 Configuration is read from the file link:settings.ini[].
 You may change location of the settings file using the environment variable `CONF_FILE`.
 
-Each section of this file (except `DEFAULT`) corresponds to a full name (slug) of a repository you want to process.
-It may contain the following fields.
+Each section of this file (except `DEFAULT`) corresponds to one or more repositories.
+The section name represents full name (slug) of a repository or regular expression matching full names of repositories you want to process.
+Push events from repositories that do not match any section are ignored.
+
+Each section may contain the following fields.
 
 branch_regex::
   A regular expression that specifies branches which should be processed.

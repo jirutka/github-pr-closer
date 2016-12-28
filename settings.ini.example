@@ -5,6 +5,6 @@ close_comment = Merged in {commits} by {committer}. Thanks for your contribution
 
     _(This pull request has been closed automatically by [GitHub PR Closer](https://github.com/jirutka/github-pr-closer). If you think that it’s not resolved yet, please add a comment.)_
 
-[username/reponame]
+[username/.*]
 hook_secret = --SOME-RANDOM-PASSPHRASE--
 branch_regex = (master|dev)

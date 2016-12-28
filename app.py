@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from configparser import ConfigParser
+from configparser import SectionProxy  # type: ignore
 from datetime import datetime
 import hashlib
 import hmac
@@ -75,7 +76,7 @@ def handle_push():
         abort(422, 'Invalid JSON payload: repository.full_name is missing')
 
     try:
-        conf = config()[repo_slug]
+        conf = repo_config(repo_slug)
     except KeyError:
         abort(400, "Unknown repository: %s" % repo_slug)
 
@@ -253,7 +254,7 @@ def gen_comment(repo_slug: str, commits: List[Commit]) -> str:
       Will be replaced by a comma-separated list of the ``commits``
       SHA hashes.
     """
-    comment = config()[repo_slug]['close_comment']
+    comment = repo_config(repo_slug)['close_comment']
 
     # Get committer's GitHub login, or just a name if his email is not
     # associated with any GitHub account.
@@ -275,6 +276,16 @@ def close_pullreq_with_comment(pullreq: PullRequest, comment: str) -> None:
 def shared_cache() -> Cache:
     maxsize = config()['DEFAULT'].getint('cache_maxsize', 250)
     return LRUCache(maxsize=maxsize)
+
+
+@memoize
+def repo_config(repo_slug: str) -> SectionProxy:
+    """Return configuration section matching the given's repository slug."""
+    try:
+        key = next(key for key in config().sections() if re.match(key, repo_slug))
+    except StopIteration:
+        raise ValueError("No configuration section for repository %s found" % repo_slug)
+    return config()[key]
 
 
 @memoize
