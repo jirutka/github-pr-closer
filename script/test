@@ -1,17 +1,18 @@
-#!/bin/bash
+#!/bin/sh
 # vim: set ts=4:
-set -eu -o pipefail
+set -eu
 
 cd "$(dirname "$0")/.."
-source script/bootstrap
+. script/bootstrap
 
-echo -e '\n==> Checking types...'
-$PYTHON -m mypy --check-untyped-defs --silent-imports *.py
-cat <<-EOF >&2
+
+einfo 'Running linter'
+python3 -m pycodestyle
+
+einfo 'Checking types'
+python3 -m mypy --check-untyped-defs --silent-imports *.py
+cat >&2 <<-EOF
 
 	NOTE: Since we currently don't have stub files for the dependencies
 	it basically checks only types from the stdlib!
 EOF
-
-echo -e '\n==> Running linter...'
-$PYTHON -m pycodestyle

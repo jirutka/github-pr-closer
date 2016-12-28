@@ -1,24 +1,56 @@
-#!/bin/bash
+#!/bin/sh
 # vim: set ts=4:
-set -eu -o pipefail
+#
+# Ensures that Python 3.3+ is available and installs packages specified
+# in requirements-dev.txt.
+#
+# Environment variables:
+#   PYTHON : Python executable to use (default is python3 or python on PATH).
+set -eu
 
 cd "$(dirname "$0")/.."
+. script/utils.sh
 
-for PYTHON in "${PYTHON:-}" python3 python NOT_FOUND; do
-	command -v "$PYTHON" &>/dev/null && break
-done
+VENV_DIR="$(pwd)/.venv"
 
-if [ "$PYTHON" = 'NOT_FOUND' ]; then
-	echo 'ERROR: Could not find python executable!' >&2
-	exit 1
+
+if [ "$(id -u)" -eq 0 ] && [ "$ALLOW_ROOT" != 'yes' ]; then
+	die 'Do not run this script as root!'
 fi
 
-if ! $PYTHON -c 'import sys; exit(not sys.version_info >= (3, 3, 0))'; then
-	echo "Python 3.3+ is required, but you have $($PYTHON -V 2>&1)!" >&2
-	exit 1
+if [ ! -f "$VENV_DIR/bin/python3" ]; then
+	einfo 'Initializing Python virtual environment'
+
+	# Find Python executable.
+	for pybin in "${PYTHON:-}" python3 python NOT_FOUND; do
+		command -v "$pybin" >/dev/null 2>&1 && break
+	done
+	if [ "$pybin" = 'NOT_FOUND' ]; then
+		die 'Could not find python executable! Please install Python 3.3+.'
+	fi
+
+	if ! "$pybin" -c 'import sys; exit(not sys.version_info >= (3, 3, 0))'; then
+		die "Python 3.3+ is required, but you have $("$pybin" -V 2>&1)!"
+	fi
+
+	# This can happen probably only on Debian-based distros.
+	if ! "$pybin" -c 'import venv' 2>/dev/null; then
+		die 'Python module venv is not installed!',
+			'TIP: If you are using Debian-based distro, run "apt-get install python3-venv".'
+	fi
+
+	# This can happen probably only on Debian-based distros.
+	if ! "$pybin" -c 'import pip' 2>/dev/null; then
+		die 'Python module pip is not installed!',
+			'TIP: If you are using Debian-based distro, run "apt-get install python3-pip".'
+	fi
+
+	"$pybin" -m venv "$VENV_DIR"
 fi
 
-echo '==> Installing dependencies...'
-$PYTHON -m pip install -r requirements-dev.txt 2>&1 \
-	| sed	-e '/^Requirement already satisfied/d' \
-			-e '/don.t match your environment$/d'
+. ./.envrc
+
+einfo 'Installing Python packages'
+python3 -m pip install -r requirements-dev.txt 2>&1 \
+	| sed -e '/^Requirement already satisfied/d' \
+		-e '/don.t match your environment$/d'
