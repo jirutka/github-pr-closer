@@ -76,6 +76,7 @@ branch_regex::
 
 cache_maxsize::
   Maximum number of pull requests' metadata to keep in LRU cache.
+  This field may be declared only in the `DEFAULT` section.
   Default is 250.
 
 close_comment::
